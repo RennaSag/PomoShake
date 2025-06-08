@@ -18,7 +18,7 @@ public class MainActivity extends Activity implements SensorEventListener {
     private TextView timerTextView, statusText;
     private CountDownTimer countDownTimer;
     private boolean timerRunning = false;
-    private long timeLeftInMillis = 1 * 60 * 1000; // 1 minuto
+    private long timeLeftInMillis = 1 * 60 * 1000; // tempo de duração = 1 minuto
     private final long TIMER_DURATION = 1 * 60 * 1000; // duração original para reset
 
     private SensorManager sensorManager;
@@ -29,7 +29,7 @@ public class MainActivity extends Activity implements SensorEventListener {
     // Controle de orientação
     private int currentOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
     private long lastOrientationChange = 0;
-    private final long ORIENTATION_DELAY = 1000; // 1 segundo de delay para evitar múltiplas mudanças
+    private final long ORIENTATION_DELAY = 1000; // 1 segundo de delay para evitar mudanças múltiplas sem necessidade
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,7 +41,7 @@ public class MainActivity extends Activity implements SensorEventListener {
 
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
 
-        // Registrar tanto acelerômetro quanto orientação
+        // Registra o acelerômetro e a orientação
         sensorManager.registerListener(this,
                 sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
                 SensorManager.SENSOR_DELAY_NORMAL);
@@ -129,19 +129,19 @@ public class MainActivity extends Activity implements SensorEventListener {
         shake = shake * 0.9f + delta;
 
         if (shake > 12) { // Sensibilidade do shake
-            // Chacoalhar sempre reinicia o timer
+            // chacoalhar sempre vai reiniciar o timer
             if (timerRunning) {
                 pauseTimer(); // Para o timer atual
             }
-            resetTimer(); // Reinicia para o tempo original
-            startTimer(); // Começa novamente
+            resetTimer(); // reinicia para o tempo original
+            startTimer(); // recomeça desde o inicio
         }
     }
 
     private void handleOrientationEvent(SensorEvent event) {
         long currentTime = System.currentTimeMillis();
 
-        // Evitar múltiplas mudanças muito rápidas
+        // evitar múltiplas mudanças muito rápidas
         if (currentTime - lastOrientationChange < ORIENTATION_DELAY) {
             return;
         }
@@ -150,13 +150,13 @@ public class MainActivity extends Activity implements SensorEventListener {
         float pitch = event.values[1];   // rotação em torno do eixo X
         float roll = event.values[2];    // rotação em torno do eixo Y
 
-        // Detectar orientação baseada no pitch
-        if (Math.abs(pitch) < 30) { // Telefone na horizontal (landscape)
+        // detectar orientação baseada no pitch
+        if (Math.abs(pitch) < 30) { // telefone na horizontal (landscape)
             if (currentOrientation != ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
                 currentOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
                 lastOrientationChange = currentTime;
 
-                // HORIZONTAL DESPAUSA
+                // despausa na horizontal
                 if (!timerRunning && timeLeftInMillis < TIMER_DURATION && timeLeftInMillis > 0) {
                     startTimer();
                     statusText.setText("Despausado (telefone na horizontal)");
@@ -169,7 +169,7 @@ public class MainActivity extends Activity implements SensorEventListener {
                 currentOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
                 lastOrientationChange = currentTime;
 
-                // AGORA VERTICAL PAUSA
+                // pausa na vertical
                 if (timerRunning) {
                     pauseTimer();
                     statusText.setText("Pausado (telefone na vertical)");
@@ -182,7 +182,6 @@ public class MainActivity extends Activity implements SensorEventListener {
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        // Não necessário
     }
 
     @Override
