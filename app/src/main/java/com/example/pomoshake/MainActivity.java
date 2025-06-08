@@ -7,6 +7,9 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.MediaPlayer;
+import android.media.ToneGenerator;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.view.View;
@@ -17,14 +20,22 @@ public class MainActivity extends Activity implements SensorEventListener {
 
     private TextView timerTextView, statusText;
     private CountDownTimer countDownTimer;
+    private CountDownTimer breakCountDownTimer; // Timer para a pausa
     private boolean timerRunning = false;
+    private boolean breakRunning = false; // Controla se está na pausa
     private long timeLeftInMillis = 1 * 60 * 1000; // tempo de duração = 1 minuto
     private final long TIMER_DURATION = 1 * 60 * 1000; // duração original para reset
+    private final long BREAK_DURATION = 10 * 1000; // 10 segundos de pausa
 
     private SensorManager sensorManager;
     private float acelVal;  // aceleração atual
     private float acelLast; // última aceleração
     private float shake;    // valor de agitação
+
+    // Geradores de som para alarmes
+    private ToneGenerator toneGenerator;
+    private MediaPlayer completionSound;
+    private MediaPlayer breakEndSound;
 
     // Controle de orientação
     private int currentOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
@@ -54,6 +65,9 @@ public class MainActivity extends Activity implements SensorEventListener {
         acelLast = SensorManager.GRAVITY_EARTH;
         shake = 0.00f;
 
+        // Inicializa os geradores de som
+        initializeSounds();
+
         updateTimerText();
     }
 
@@ -66,13 +80,34 @@ public class MainActivity extends Activity implements SensorEventListener {
 
             public void onFinish() {
                 timerRunning = false;
+                playCompletionAlarm(); // Toca alarme de conclusão
                 showCelebrationDialog();
-                resetTimer();
+                startBreakTimer(); // Inicia a pausa automática
             }
         }.start();
 
         timerRunning = true;
         statusText.setText("Cronômetro rodando...");
+    }
+
+    private void startBreakTimer() {
+        breakRunning = true;
+        statusText.setText("🎉 Parabéns! Pausa de 10 segundos...");
+
+        breakCountDownTimer = new CountDownTimer(BREAK_DURATION, 1000) {
+            public void onTick(long millisUntilFinished) {
+                int secondsLeft = (int) (millisUntilFinished / 1000) + 1;
+                timerTextView.setText("00:0" + secondsLeft);
+                statusText.setText("🎉 Parabéns! Pausa: " + secondsLeft + "s");
+            }
+
+            public void onFinish() {
+                breakRunning = false;
+                playBreakEndAlarm(); // Toca alarme de fim de pausa
+                resetTimer();
+                startTimer(); // Reinicia automaticamente o timer principal
+            }
+        }.start();
     }
 
     private void pauseTimer() {
@@ -83,17 +118,26 @@ public class MainActivity extends Activity implements SensorEventListener {
         statusText.setText("Pausado");
     }
 
+    private void pauseBreakTimer() {
+        if (breakCountDownTimer != null) {
+            breakCountDownTimer.cancel();
+        }
+        breakRunning = false;
+    }
+
     private void resetTimer() {
         timeLeftInMillis = TIMER_DURATION;
         updateTimerText();
-        statusText.setText("Timer reiniciado! Chacoalhe para começar novamente.");
+        if (!breakRunning) {
+            statusText.setText("Timer reiniciado! Chacoalhe para começar novamente.");
+        }
     }
 
     private void showCelebrationDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("🎉 PARABÉNS! 🎉");
-        builder.setMessage("Você completou uma sessão de Pomodoro!\n\nTempo para uma pausa bem merecida!");
-        builder.setPositiveButton("Continuar", (dialog, which) -> {
+        builder.setMessage("Você completou uma sessão de Pomodoro!\n\nPausa automática de 10 segundos iniciando...");
+        builder.setPositiveButton("OK", (dialog, which) -> {
             dialog.dismiss();
         });
         builder.setCancelable(false);
@@ -107,6 +151,109 @@ public class MainActivity extends Activity implements SensorEventListener {
         int seconds = (int) (timeLeftInMillis / 1000) % 60;
         String timeFormatted = String.format("%02d:%02d", minutes, seconds);
         timerTextView.setText(timeFormatted);
+    }
+
+    private void initializeSounds() {
+        try {
+            // Inicializa o gerador de tons (backup)
+            toneGenerator = new ToneGenerator(AudioManager.STREAM_ALARM, 80);
+
+            // Carrega arquivos de áudio personalizados
+            try {
+                completionSound = MediaPlayer.create(this, R.raw.completion_sound);
+                breakEndSound = MediaPlayer.create(this, R.raw.break_end_sound);
+
+                // Configura o volume para stream de alarme
+                if (completionSound != null) {
+                    completionSound.setAudioStreamType(AudioManager.STREAM_ALARM);
+                }
+                if (breakEndSound != null) {
+                    breakEndSound.setAudioStreamType(AudioManager.STREAM_ALARM);
+                }
+            } catch (Exception e) {
+                // Se não conseguir carregar os arquivos, usa tons do sistema
+                System.out.println("Arquivos de áudio não encontrados, usando tons do sistema");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void playCompletionAlarm() {
+        try {
+            // Prioriza arquivo MP3 personalizado
+            if (completionSound != null) {
+                completionSound.start();
+            } else {
+                // Fallback para tons do sistema
+                if (toneGenerator != null) {
+                    // Sequência: 3 bips longos
+                    new Thread(() -> {
+                        try {
+                            for (int i = 0; i < 3; i++) {
+                                toneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 500);
+                                Thread.sleep(700);
+                            }
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }).start();
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void playBreakEndAlarm() {
+        try {
+            // Prioriza arquivo MP3 personalizado
+            if (breakEndSound != null) {
+                breakEndSound.start();
+            } else {
+                // Fallback para tons do sistema
+                if (toneGenerator != null) {
+                    // Sequência: 2 bips rápidos + 1 longo
+                    new Thread(() -> {
+                        try {
+                            // 2 bips rápidos
+                            toneGenerator.startTone(ToneGenerator.TONE_CDMA_PIP, 200);
+                            Thread.sleep(300);
+                            toneGenerator.startTone(ToneGenerator.TONE_CDMA_PIP, 200);
+                            Thread.sleep(300);
+                            // 1 bip longo
+                            toneGenerator.startTone(ToneGenerator.TONE_CDMA_ALERT_NETWORK_LITE, 800);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }).start();
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void releaseSounds() {
+        try {
+            if (toneGenerator != null) {
+                toneGenerator.release();
+                toneGenerator = null;
+            }
+            if (completionSound != null) {
+                completionSound.release();
+                completionSound = null;
+            }
+            if (breakEndSound != null) {
+                breakEndSound.release();
+                breakEndSound = null;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -129,6 +276,14 @@ public class MainActivity extends Activity implements SensorEventListener {
         shake = shake * 0.9f + delta;
 
         if (shake > 12) { // Sensibilidade do shake
+            // Se estiver na pausa, interrompe a pausa e reinicia
+            if (breakRunning) {
+                pauseBreakTimer();
+                resetTimer();
+                startTimer();
+                return;
+            }
+
             // chacoalhar sempre vai reiniciar o timer
             if (timerRunning) {
                 pauseTimer(); // Para o timer atual
@@ -143,6 +298,11 @@ public class MainActivity extends Activity implements SensorEventListener {
 
         // evitar múltiplas mudanças muito rápidas
         if (currentTime - lastOrientationChange < ORIENTATION_DELAY) {
+            return;
+        }
+
+        // Não processar orientação durante a pausa automática
+        if (breakRunning) {
             return;
         }
 
@@ -200,5 +360,11 @@ public class MainActivity extends Activity implements SensorEventListener {
         sensorManager.registerListener(this,
                 sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION),
                 SensorManager.SENSOR_DELAY_NORMAL);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        releaseSounds(); // Libera recursos de áudio
     }
 }
