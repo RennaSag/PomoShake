@@ -11,15 +11,17 @@ import android.widget.TextView;
 public class MainActivity extends Activity implements SensorEventListener {
 
     private static final String TAG = "PomoShake";
+
     private TextView timerTextView, statusText;
     private CountDownTimer countDownTimer, breakTimer;
     private boolean timerRunning = false, breakRunning = false, waitingForShake = false;
+
     private long timeLeft = 60_000, TIMER_DURATION = 60_000, BREAK_DURATION = 10_000;
+
     private SensorManager sensorManager;
     private float acelVal, acelLast, shake;
-    private ToneGenerator toneGen;
+
     private MediaPlayer completionSound, breakEndSound;
-    private AudioManager audioManager;
     private Vibrator vibrator;
 
     @Override
@@ -29,15 +31,17 @@ public class MainActivity extends Activity implements SensorEventListener {
 
         timerTextView = findViewById(R.id.timerTextView);
         statusText = findViewById(R.id.statusText);
-        audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
+
         vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
 
         acelVal = acelLast = SensorManager.GRAVITY_EARTH;
         shake = 0.0f;
+
         registerSensors();
         initializeSounds();
         updateTimerText();
+
         statusText.setText("Chacoalhe para começar!");
         setupSoundTestListener();
     }
@@ -68,8 +72,7 @@ public class MainActivity extends Activity implements SensorEventListener {
                 playBreakEndAlarm();
                 Thread.sleep(3000);
                 runOnUiThread(() -> statusText.setText("Teste concluído!"));
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
         }).start();
     }
 
@@ -108,43 +111,91 @@ public class MainActivity extends Activity implements SensorEventListener {
         statusText.setText("Pausa de 10s...");
     }
 
-    private void pauseTimer() { if (countDownTimer != null) countDownTimer.cancel(); timerRunning = false; statusText.setText("Pausado"); }
-    private void pauseBreak() { if (breakTimer != null) breakTimer.cancel(); breakRunning = false; }
-    private void resetTimer() { timeLeft = TIMER_DURATION; updateTimerText(); }
+    private void pauseTimer() {
+        if (countDownTimer != null) countDownTimer.cancel();
+        timerRunning = false;
+        statusText.setText("Pausado");
+    }
+
+    private void pauseBreak() {
+        if (breakTimer != null) breakTimer.cancel();
+        breakRunning = false;
+    }
+
+    private void resetTimer() {
+        timeLeft = TIMER_DURATION;
+        updateTimerText();
+    }
 
     private void updateTimerText() {
-        int m = (int) (timeLeft / 1000) / 60, s = (int) (timeLeft / 1000) % 60;
+        int m = (int) (timeLeft / 1000) / 60;
+        int s = (int) (timeLeft / 1000) % 60;
         timerTextView.setText(String.format("%02d:%02d", m, s));
     }
 
     private void initializeSounds() {
         releaseSounds();
-        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0);
-        toneGen = new ToneGenerator(AudioManager.STREAM_ALARM, 100);
         completionSound = MediaPlayer.create(this, R.raw.completion_sound);
         breakEndSound = MediaPlayer.create(this, R.raw.break_end_sound);
     }
 
     private void releaseSounds() {
-        if (toneGen != null) toneGen.release();
-        if (completionSound != null) completionSound.release();
-        if (breakEndSound != null) breakEndSound.release();
+        if (completionSound != null) {
+            completionSound.release();
+            completionSound = null;
+        }
+        if (breakEndSound != null) {
+            breakEndSound.release();
+            breakEndSound = null;
+        }
     }
 
     private void playCompletionAlarm() {
-        if (completionSound != null) completionSound.start();
-        if (vibrator != null) vibrator.vibrate(new long[]{0, 500, 200, 500}, -1);
-        if (toneGen != null) toneGen.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 500);
+        if (completionSound != null) {
+            try {
+                if (completionSound.isPlaying()) {
+                    completionSound.stop();
+                    completionSound.prepare();
+                }
+                completionSound.start();
+            } catch (Exception e) {
+                Log.e(TAG, "Erro ao tocar som de conclusão", e);
+            }
+        }
+
+        if (vibrator != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE));
+            }
+        }
     }
 
     private void playBreakEndAlarm() {
-        if (breakEndSound != null) breakEndSound.start();
-        if (vibrator != null) vibrator.vibrate(new long[]{0, 200, 100, 200}, -1);
-        if (toneGen != null) toneGen.startTone(ToneGenerator.TONE_CDMA_PIP, 300);
+        if (breakEndSound != null) {
+            try {
+                if (breakEndSound.isPlaying()) {
+                    breakEndSound.stop();
+                    breakEndSound.prepare();
+                }
+                breakEndSound.start();
+            } catch (Exception e) {
+                Log.e(TAG, "Erro ao tocar som de fim de pausa", e);
+            }
+        }
+
+        if (vibrator != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE));
+            }
+        }
     }
 
     private void showDialog(String title, String msg) {
-        new AlertDialog.Builder(this).setTitle(title).setMessage(msg).setPositiveButton("OK", null).show();
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(msg)
+                .setPositiveButton("OK", null)
+                .show();
     }
 
     @Override
@@ -157,17 +208,38 @@ public class MainActivity extends Activity implements SensorEventListener {
             shake = shake * 0.9f + delta;
 
             if (shake > 12) {
-                if (waitingForShake) { startTimer(); return; }
-                if (breakRunning) { pauseBreak(); resetTimer(); startTimer(); return; }
+                if (waitingForShake) {
+                    startTimer();
+                    return;
+                }
+                if (breakRunning) {
+                    pauseBreak();
+                    resetTimer();
+                    startTimer();
+                    return;
+                }
                 if (timerRunning) pauseTimer();
-                resetTimer(); startTimer();
+                resetTimer();
+                startTimer();
             }
         }
     }
 
     @Override public void onAccuracyChanged(Sensor s, int a) {}
 
-    @Override protected void onPause() { super.onPause(); sensorManager.unregisterListener(this); }
-    @Override protected void onResume() { super.onResume(); registerSensors(); initializeSounds(); }
-    @Override protected void onDestroy() { super.onDestroy(); releaseSounds(); }
+    @Override protected void onPause() {
+        super.onPause();
+        sensorManager.unregisterListener(this);
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        registerSensors();
+        initializeSounds();
+    }
+
+    @Override protected void onDestroy() {
+        super.onDestroy();
+        releaseSounds();
+    }
 }
