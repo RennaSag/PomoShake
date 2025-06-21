@@ -17,6 +17,19 @@
         android:layout_centerHorizontal="true"
         android:layout_marginTop="40dp" />
 
+    <!-- Botão de Configuração -->
+    <Button
+        android:id="@+id/settingsButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="⚙️ Configurar Timer"
+        android:layout_below="@id/titleText"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="20dp"
+        android:backgroundTint="#d32f2f"
+        android:textColor="#ffffff"
+        android:elevation="4dp"/>
+
     <!-- Timer Principal -->
     <TextView
         android:id="@+id/timerTextView"

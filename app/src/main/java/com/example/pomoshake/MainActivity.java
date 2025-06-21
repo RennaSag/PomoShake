@@ -1,7 +1,7 @@
 package com.example.pomoshake;
 
 import android.app.*;
-import android.content.pm.ActivityInfo;
+import android.content.Intent;
 import android.hardware.*;
 import android.media.*;
 import android.os.*;
@@ -11,12 +11,15 @@ import android.widget.TextView;
 public class MainActivity extends Activity implements SensorEventListener {
 
     private static final String TAG = "PomoShake";
+    private static final int SETTINGS_REQUEST = 123;
 
     private TextView timerTextView, statusText;
     private CountDownTimer countDownTimer, breakTimer;
     private boolean timerRunning = false, breakRunning = false, waitingForShake = false;
 
-    private long timeLeft = 60_000, TIMER_DURATION = 60_000, BREAK_DURATION = 10_000;
+    private long timeLeft = 60_000;
+    private long TIMER_DURATION = 60_000;
+    private long BREAK_DURATION = 10_000;
 
     private SensorManager sensorManager;
     private float acelVal, acelLast, shake;
@@ -31,7 +34,6 @@ public class MainActivity extends Activity implements SensorEventListener {
 
         timerTextView = findViewById(R.id.timerTextView);
         statusText = findViewById(R.id.statusText);
-
         vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
 
@@ -44,10 +46,20 @@ public class MainActivity extends Activity implements SensorEventListener {
 
         statusText.setText("Chacoalhe para começar!");
         setupSoundTestListener();
+
+        // Botão de configurações
+        findViewById(R.id.settingsButton).setOnClickListener(v -> {
+            Intent intent = new Intent(this, SettingsActivity.class);
+            intent.putExtra("pomodoro", TIMER_DURATION);
+            intent.putExtra("break", BREAK_DURATION);
+            startActivityForResult(intent, SETTINGS_REQUEST);
+        });
     }
 
     private void registerSensors() {
-        sensorManager.registerListener(this, sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
+        sensorManager.registerListener(this,
+                sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+                SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     private void setupSoundTestListener() {
@@ -163,10 +175,8 @@ public class MainActivity extends Activity implements SensorEventListener {
             }
         }
 
-        if (vibrator != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE));
-            }
+        if (vibrator != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE));
         }
     }
 
@@ -183,10 +193,8 @@ public class MainActivity extends Activity implements SensorEventListener {
             }
         }
 
-        if (vibrator != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE));
-            }
+        if (vibrator != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE));
         }
     }
 
@@ -225,7 +233,7 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
     }
 
-    @Override public void onAccuracyChanged(Sensor s, int a) {}
+    @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}
 
     @Override protected void onPause() {
         super.onPause();
@@ -241,5 +249,17 @@ public class MainActivity extends Activity implements SensorEventListener {
     @Override protected void onDestroy() {
         super.onDestroy();
         releaseSounds();
+    }
+
+    // Receber dados personalizados da tela de configuração
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == SETTINGS_REQUEST && resultCode == RESULT_OK && data != null) {
+            TIMER_DURATION = data.getLongExtra("newPomodoro", 60_000);
+            BREAK_DURATION = data.getLongExtra("newBreak", 10_000);
+            resetTimer();
+            statusText.setText("Tempos atualizados! Chacoalhe para começar.");
+        }
     }
 }
